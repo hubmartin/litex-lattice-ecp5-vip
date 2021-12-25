@@ -91,52 +91,6 @@ class _CRG_VERSA(Module):
         ]
 
 
-class _CRGSDRAM(Module):
-    def __init__(self, platform, sys_clk_freq):
-        self.rst = Signal()
-        self.clock_domains.cd_init    = ClockDomain()
-        self.clock_domains.cd_por     = ClockDomain(reset_less=True)
-        self.clock_domains.cd_sys     = ClockDomain()
-        self.clock_domains.cd_sys2x   = ClockDomain()
-        self.clock_domains.cd_sys2x_i = ClockDomain(reset_less=True)
-
-        # # #
-
-        self.stop  = Signal()
-        self.reset = Signal()
-
-        # Clk / Rst
-        clk27 = platform.request("clk27")
-        rst_n = platform.request("rst_n")
-
-        # PLL
-        sys2x_clk_ecsout = Signal()
-        self.submodules.pll = pll = ECP5PLL()
-        self.comb += pll.reset.eq(~rst_n | self.rst)
-        pll.register_clkin(clk27, 27e6)
-        pll.create_clkout(self.cd_sys2x_i, 2*sys_clk_freq)
-        pll.create_clkout(self.cd_init,   25e6)
-        self.specials += [
-            Instance("ECLKBRIDGECS",
-                i_CLK0   = self.cd_sys2x_i.clk,
-                i_SEL    = 0,
-                o_ECSOUT = sys2x_clk_ecsout,
-            ),
-            Instance("ECLKSYNCB",
-                i_ECLKI = sys2x_clk_ecsout,
-                i_STOP  = self.stop,
-                o_ECLKO = self.cd_sys2x.clk),
-            Instance("CLKDIVF",
-                p_DIV     = "2.0",
-                i_ALIGNWD = 0,
-                i_CLKI    = self.cd_sys2x.clk,
-                i_RST     = self.reset,
-                o_CDIVX   = self.cd_sys.clk),
-            AsyncResetSynchronizer(self.cd_sys,    ~pll.locked | self.reset),
-            AsyncResetSynchronizer(self.cd_sys2x,  ~pll.locked | self.reset),
-        ]
-
-
 # BaseSoC ------------------------------------------------------------------------------------------
 
 class BaseSoC(SoCCore):
