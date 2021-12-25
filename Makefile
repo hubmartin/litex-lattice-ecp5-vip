@@ -41,9 +41,9 @@ litex_term:
 
 backup:
 	cp Makefile github-remote/
-	cp Makefile github-remote/
 	cp litex-boards/litex_boards/targets/lattice_ecp5_evn.py github-remote/targets/
 	cp litex-boards/litex_boards/platforms/lattice_ecp5_evn.py github-remote/platforms/
+	rsync -a --exclude '*.d' --exclude '*.o' --exclude '*.elf' demo/ github-remote/demo/
 
 #openocd -f ecp5-evn.cfg -c "transport select jtag; init; svf build/lattice_ecp5_evn/gateware/lattice_ecp5_evn.svf; exit"
 
