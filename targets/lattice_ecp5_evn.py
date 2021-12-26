@@ -20,29 +20,10 @@ from litex.soc.integration.builder import *
 from litex.soc.integration.soc import SoCRegion
 from litex.soc.cores.led import LedChaser, WS2812
 
-from litedram.modules import MT41J128M16
+from litedram.modules import MT41J128M16, MT41K64M16
 from litedram.phy import ECP5DDRPHY
 
 # CRG ----------------------------------------------------------------------------------------------
-
-class _CRG(Module):
-    def __init__(self, platform, sys_clk_freq):
-        self.rst = Signal()
-        self.clock_domains.cd_sys = ClockDomain()
-
-        # # #
-
-        # clk / rst
-        clk27 = platform.request("clk27")
-        clk100 = platform.request("clk100")
-        rst_n = platform.request("rst_n")
-
-        # pll
-        self.submodules.pll = pll = ECP5PLL()
-        self.comb += pll.reset.eq(~rst_n | self.rst)
-        pll.register_clkin(clk100, 100e6)
-        pll.create_clkout(self.cd_sys, sys_clk_freq)
-
 
 class _CRG_VERSA(Module):
     def __init__(self, platform, sys_clk_freq):
@@ -94,19 +75,16 @@ class _CRG_VERSA(Module):
 # BaseSoC ------------------------------------------------------------------------------------------
 
 class BaseSoC(SoCCore):
-    mem_map = {**SoCCore.mem_map, **{"spiflash": 0x1000000}}
+    #mem_map = {**SoCCore.mem_map, **{"spiflash": 0x1000000}}
     def __init__(self, sys_clk_freq=int(50e6), x5_clk_freq=None, toolchain="trellis",
                  with_led_chaser=True, **kwargs):
         platform = ecp5_evn.Platform(toolchain=toolchain)
 
-
-        bios_flash_offset = 0x400000
+        #bios_flash_offset = 0x400000
 
         # Set CPU variant / reset address
-        kwargs["cpu_reset_address"] = self.mem_map["spiflash"] + bios_flash_offset
-        kwargs["integrated_rom_size"] = 0
-
-        #kwargs["integrated_main_ram_size"] = 0
+        #kwargs["cpu_reset_address"] = self.mem_map["spiflash"] + bios_flash_offset
+        kwargs["integrated_rom_size"] = 0x10000
 
         # SoCCore ----------------------------------------------------------------------------------
         SoCCore.__init__(self, platform, sys_clk_freq,
@@ -118,8 +96,6 @@ class BaseSoC(SoCCore):
 
         # CRG --------------------------------------------------------------------------------------
         crg_cls = _CRG_VERSA
-        #crg_cls = _CRGSDRAM #if not self.integrated_main_ram_size else _CRG
-        #crg_cls = _CRGSDRAM if not self.integrated_main_ram_size else _CRG
         self.submodules.crg = crg_cls(platform, sys_clk_freq)
 
         # DDR3 SDRAM -------------------------------------------------------------------------------
@@ -131,7 +107,7 @@ class BaseSoC(SoCCore):
             self.comb += self.crg.reset.eq(self.ddrphy.init.reset)
             self.add_sdram("sdram",
                 phy           = self.ddrphy,
-                module        = MT41J128M16(sys_clk_freq, "1:2"),
+                module        = MT41K64M16(sys_clk_freq, "1:2"), # Not entirely MT41J64M16 but similar and works(c)
                 l2_cache_size = kwargs.get("l2_size", 8192),
             )
 
@@ -148,17 +124,20 @@ class BaseSoC(SoCCore):
             size   = 4*4,
         ))
 
-        # SPI Flash --------------------------------------------------------------------------------
-        from litespi.modules import MX25L12835F
-        from litespi.opcodes import SpiNorFlashOpCodes as Codes
-        self.add_spi_flash(mode="1x", module=MX25L12835F(Codes.READ_1_1_1), with_master=False)
+        # Running code from SPI flash had some side effects on BIOS with enabled DDR3 memory
+        # So I reverted to the FPGA BRAM for BIOS.
 
-        # Add ROM linker region --------------------------------------------------------------------
-        self.bus.add_region("rom", SoCRegion(
-            origin = self.mem_map["spiflash"] + bios_flash_offset,
-            size   = (16-4)*1024*1024,
-            linker = True)
-        )
+        # # SPI Flash --------------------------------------------------------------------------------
+        # from litespi.modules import MX25L12835F
+        # from litespi.opcodes import SpiNorFlashOpCodes as Codes
+        # self.add_spi_flash(mode="1x", module=MX25L12835F(Codes.READ_1_1_1), with_master=False)
+
+        # # Add ROM linker region --------------------------------------------------------------------
+        # self.bus.add_region("rom", SoCRegion(
+        #     origin = self.mem_map["spiflash"] + bios_flash_offset,
+        #     size   = (16-4)*1024*1024,
+        #     linker = True)
+        # )
 
 # Build --------------------------------------------------------------------------------------------
 
@@ -167,7 +146,7 @@ def main():
     parser.add_argument("--build",        action="store_true", help="Build bitstream")
     parser.add_argument("--load",         action="store_true", help="Load bitstream")
     parser.add_argument("--toolchain",    default="trellis",   help="FPGA toolchain: trellis (default) or diamond")
-    parser.add_argument("--sys-clk-freq", default=60e6,        help="System clock frequency (default: 60MHz)")
+    parser.add_argument("--sys-clk-freq", default=80e6,        help="System clock frequency (default: 60MHz)")
     parser.add_argument("--x5-clk-freq",  type=int,            help="Use X5 oscillator as system clock at the specified frequency")
     builder_args(parser)
     soc_core_args(parser)

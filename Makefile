@@ -19,6 +19,9 @@ build_demo_ecp5:
 flash_ecp5_bios:
 	openFPGALoader -b ecpix5 build/lattice_ecp5_evn/software/bios/bios.bin -f --offset 0x400000
 
+flash_ecp5_bitstream:
+	openFPGALoader -b ecpix5 build/lattice_ecp5_evn/gateware/lattice_ecp5_evn.bit -f
+
 flash_demo:
 	sudo tinyprog -u demo/demo.bin
 

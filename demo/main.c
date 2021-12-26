@@ -109,14 +109,14 @@ static void led_cmd(void)
 	int i;
 	printf("WS2812 demo...\n");
 
-	uint32_t *ws2812 = WS2812_BASE;
+	#define WS2812_BUFFER (*((volatile unsigned int *) WS2812_BASE))
 
 	for(i=0; i<32; i++) {
-		*ws2812 = 0x100000;
+		WS2812_BUFFER = 0x100000;
 		busy_wait(500);
-		*ws2812 = 0x001000;
+		WS2812_BUFFER = 0x001000;
 		busy_wait(500);
-		*ws2812 = 0x000010;
+		WS2812_BUFFER = 0x000010;
 		busy_wait(500);
 	}
 }
